@@ -21,7 +21,7 @@ echo "Loading..."
 # Test if jq tool is installed on the system
 type jq &> /dev/null
 if [[ $? -eq 1 ]]; then
-  echo -e "Tools jq not installed...\nyou can found installation steps in https://stedolan.github.io/jq/"
+  echo -e "Tools jq not installed...\nyou can find installation steps in https://stedolan.github.io/jq/"
   exit
 fi
 

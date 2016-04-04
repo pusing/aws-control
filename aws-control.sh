@@ -2,7 +2,7 @@
 ################################################################################################################################
 ##                                      A script to list & control AWS instances
 ##
-## AWS Commands:
+##  AWS Commands:
 ##    aws ec2 describe-instance-status --include-all-instances --region us-east-1 --output table
 ##    aws ec2 describe-instance-status --include-all-instances --region us-east-1 | jq '.InstanceStatuses[range(0;10)].InstanceId'
 ##    aws ec2 describe-instance-status --include-all-instances --region us-east-1 |  grep InstanceId | wc -l
@@ -25,6 +25,8 @@ light_green='\033[1;32m'
 blue='\033[0;34m'
 light_blue='\033[0;34m'
 
+bold=$(tput bold)
+normal=$(tput sgr0)
 # AWS REGIONS ARRAY
 AWS_REGIONS=( "us-east-1"
               "us-west-1"
@@ -64,30 +66,48 @@ fi
 function list_instances() {
   echo -e $reset_ink
   for region in "${AWS_REGIONS[@]}" ; do
-    instanceCount=`aws ec2 describe-instance-status --include-all-instances --region $region |  grep InstanceId | wc -l`
-    echo -e "Region: "$region"\t\tNumber of instances: "$instanceCount
+    instancesCount=`aws ec2 describe-instance-status --include-all-instances --region $region |  grep InstanceId | wc -l`
+    echo -e ${bold}"Region: "${normal}$region"\t\t${bold}Number of instances: "$instancesCount${normal}
 
-    instanceIDs=( `aws ec2 describe-instance-status --include-all-instances --region $region | jq -r '.InstanceStatuses[range(0;'$instanceCount')].InstanceId'` )
-    instanceStates=( `aws ec2 describe-instance-status --include-all-instances --region $region | jq -r '.InstanceStatuses[range(0;'$instanceCount')].InstanceState.Name'`  )
+    instancesIDs=( `aws ec2 describe-instance-status --include-all-instances --region $region | jq -r '.InstanceStatuses[range(0;'$instancesCount')].InstanceId'` )
+    instancesStates=( `aws ec2 describe-instance-status --include-all-instances --region $region | jq -r '.InstanceStatuses[range(0;'$instancesCount')].InstanceState.Name'`  )
 
-    echo -e "=========================================================="
-    echo -e "Instance ID\t\tInstance State"
-    for (( i = 0; i < $instanceCount; i++ )); do
-      if [[ "${instanceStates[$i]}" == "running" ]]; then
-        echo -e $green${instanceIDs[$i]}"\t\t"${instanceStates[$i]}$reset_ink
+    instancesPublicIPs=( `aws ec2 describe-instances --region $region --instance-ids ${instanceIDs[@]}  | jq -r '.Reservations[range(0;'$instancesCount')].Instances[0].PublicIpAddress'` )
+    instancesPrivateIPs=( `aws ec2 describe-instances --region $region --instance-ids ${instanceIDs[@]}  | jq -r '.Reservations[range(0;'$instancesCount')].Instances[0].PrivateIpAddress'` )
+    instancesTypes=( `aws ec2 describe-instances --region $region --instance-ids ${instanceIDs[@]}  | jq -r '.Reservations[range(0;'$instancesCount')].Instances[0].InstanceType' ` )
 
-      elif [[ "${instanceStates[$i]}" == "stopped" ]]; then
-        echo -e $yellow${instanceIDs[$i]}"\t\t"${instanceStates[$i]}$reset_ink
+    for (( i = 0; i < 104; i++ )); do echo -n "=" ; done
+    echo -en "\n"
 
-      elif [[ "${instanceStates[$i]}" == "terminated" ]]; then
-        echo -e $red${instanceIDs[$i]}"\t\t"${instanceStates[$i]}$reset_ink
+    echo -en ${bold}"Instance ID\t\tInstance State\tInstance Type\t\tPrivate IP\t\tPublic IP\n"${normal}
+
+    echo -en $reset_ink
+    for (( i = 0; i < 104; i++ )); do echo -n "=" ; done
+    echo -en "\n"
+
+    for (( i = 0; i < $instancesCount; i++ )); do
+      if [[ "${instancesStates[$i]}" == "running" ]]; then
+        echo -e $green${instancesIDs[$i]}"\t\t"${instancesStates[$i]}"\t\t"${instancesTypes[$i]}\
+        "\t\t"${instancesPrivateIPs[$i]}"\t\t"${instancesPublicIPs[$i]}
+
+      elif [[ "${instancesStates[$i]}" == "stopped" ]]; then
+        echo -e $yellow${instancesIDs[$i]}"\t\t"${instancesStates[$i]}"\t\t"${instancesTypes[$i]}\
+        "\t\t"${instancesPrivateIPs[$i]}"\t\t"${instancesPublicIPs[$i]}
+      elif [[ "${instancesStates[$i]}" == "terminated" ]]; then
+        echo -e $red${instancesIDs[$i]}"\t\t"${instancesStates[$i]}"\t\t"${instancesTypes[$]}\
+        "\t\t"${instancesPrivateIPs[$i]}"\t\t"${instancesPublicIPs[$i]}
       else
-        echo -e $reset_ink${instanceIDs[$i]}"\t\t"${instanceStates[$i]}$reset_ink
+        echo -e $reset_ink${instancesIDs[$i]}"\t\t"${instancesStates[$i]}"\t\t"${instancesTypes[$]}\
+        "\t\t"${instancesPrivateIPs[$i]}"\t\t"${instancesPublicIPs[$i]}
       fi
     done
-    echo -e $reset_ink"==========================================================\n\n"
-  done
 
+    if [[ $instancesCount -gt 0 ]]; then
+      echo -en $reset_ink
+      for (( i = 0; i < 104; i++ )); do echo -n "=" ; done
+    fi
+    echo -e "\n\n"
+  done
 }
 
 function change_def_region(){
@@ -167,6 +187,6 @@ do
 
     "Terminate Instances" ) terminate_instances ;;
 
-    "Quit" )  exit;;
+    "Quit" )  echo -e $reset_ink ; exit ;;
   esac
 done
